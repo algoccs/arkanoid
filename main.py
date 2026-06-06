@@ -2,11 +2,13 @@ import pygame
 from random import *
 
 pygame.init()
+pygame.font.init()
 
 ANCHO, ALTO = 500, 500
 COLOR_FONDO = (64, 201, 144)
 BLACK = (0,0,0)
 WHITE = (255,255,255)
+RED = (163, 26, 26)
 FPS = 40
 # CONFIGURACION DE LA PANTALLA
 screen = pygame.display.set_mode((ANCHO, ALTO))
@@ -27,9 +29,9 @@ class Area():
     def set_border(self, border_color, border_size):
         pygame.draw.rect(screen, border_color, self.rect, border_size)
     
-    def is_collide(self, x, y):
+    def rebote(self, rect):
         # devuelve True o False en caso de colision con el rectangulo
-        return self.rect.collidepoint(x, y) 
+        return self.rect.colliderect(rect) 
 
 class Picture(Area):
     def __init__(self, img_file, x, y, ancho, alto):
@@ -40,8 +42,16 @@ class Picture(Area):
         self.fill()
         screen.blit(self.image, (self.rect.x + dist_x, self.rect.y + dist_y))
 
-player = Picture('platform.png', 200, 300, 50, 50)
-ball = Picture('ball.png', 200, 200, 50, 50)
+class Label(Area):
+    def set_text(self, text, size, text_color=BLACK):
+        self.image = pygame.font.SysFont("Arial", size).render(text, 1, text_color)
+
+    def draw(self, dist_x=10, dist_y=10):
+        self.fill()
+        screen.blit(self.image, (self.rect.x + dist_x, self.rect.y + dist_y))
+
+player = Picture('platform.png', 200, 300, 100, 50)
+ball = Picture('ball.png', 300, 200, 50, 50)
 monsters = [] # LISTA PARA ALMACENAR LOS ENEMIGOS
 enemigos_por_fila = [9, 8, 7] 
 
@@ -54,20 +64,44 @@ for fila in range(3):
         enemy = Picture('enemy.png', x, y, 50, 50)
         monsters.append(enemy)
 
-move_right = True
 finish = False
+move_right = False
+move_left = False
+speed_x, speed_y = 1, 1
+quedan_mostruos = True
+
 while True:
     for event in pygame.event.get():
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_d:
                 move_right = True
-            if event.key == pygame.K_a:
+        elif event.type == pygame.KEYUP:
+            if event.key == pygame.K_d:
                 move_right = False
-        
-        if move_right == True:
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_a:
+                move_left = True
+        elif event.type == pygame.KEYUP:
+            if event.key == pygame.K_a:
+                move_left = False
+
+    if move_right and player.rect.x <=  ANCHO -100:
         player.rect.x += 3
-        if move_right == False:
+    if move_left and player.rect.x >= 0:
         player.rect.x -= 3
+        
+    ball.rect.x += speed_x
+    ball.rect.y += speed_y
+
+    if ball.rect.x >= ANCHO -50:
+        speed_x *= -1
+    if ball.rect.x <= 0:
+        speed_x *= -1
+    if ball.rect.y <= 0:
+        speed_y *= -1
+    # COMO HACER QUE REBOTE CON LA PLATAFORMA???
+    if player.rebote(ball.rect):
+        speed_y *= -1
 
     # Validar si el juego ha finalizado
     if not finish:
@@ -76,13 +110,19 @@ while True:
         ball.draw()
         for enemy in monsters:
             enemy.draw()
+        
+        # CONDICION DE DERROTA
+        if ball.rect.y > player.rect.y + 10:
+            finish = True
+            screen.fill(RED)
+            text_derrota = Label(50, 200, 300, 100, RED)
+            text_derrota.set_text('PERDISTE', 80, WHITE)
+            text_derrota.draw()
 
-    if move_right == True:
-        player.rect.x += 3
-    if move_right == False:
-        player.rect.x -= 3
-
-
+        # CONDICION DE VICTORIA
+        if len(monsters) == 0:
+            quedan_mostruos = False
+            # mostrar pantalla de victoria!
 
     pygame.display.update()
     reloj.tick(FPS)
